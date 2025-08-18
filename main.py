@@ -8,33 +8,54 @@ if __name__ == "__main__":
     targets = load_scrape_targets()
     import json
     import re
+    import pandas as pd
+    all_rows = []
     for target in targets:
         name = target.get('name') or target.get('Name') or 'website'
+        url = target.get('url') or target.get('URL')
+        selector = target.get('Selector') or target.get('selector')
         print(f"Starte KI-gestützte Extraktion für {name}...")
         try:
             result = smart_ki_extraction(target)
             print("Extrahierte Daten:")
             print(result)
             # Fallback: Falls result kein echtes JSON ist, extrahiere den JSON-Codeblock
-            if isinstance(result, list):
-                df = pd.DataFrame(result)
-            else:
+            if not isinstance(result, list):
                 match = re.search(r"```json\s*(\[.*?\])\s*```", str(result), re.DOTALL)
                 if match:
-                    data = json.loads(match.group(1))
-                    df = pd.DataFrame(data)
+                    result = json.loads(match.group(1))
                 else:
                     match = re.search(r"(\[.*?\])", str(result), re.DOTALL)
                     if match:
-                        data = json.loads(match.group(1))
-                        df = pd.DataFrame(data)
+                        result = json.loads(match.group(1))
                     else:
-                        raise ValueError("Konnte keine JSON-Daten extrahieren!")
-            filename = f"{name.lower().replace(' ', '_')}_projekte.xlsx"
-            df.to_excel(filename, index=False)
-            print(f"Excel-Datei '{filename}' wurde erstellt.")
+                        print(f"Warnung: Konnte keine JSON-Daten extrahieren für {name}!")
+                        continue
+            from urllib.parse import urlparse, urljoin
+            base_url = url
+            if base_url:
+                parsed = urlparse(base_url)
+                domain = f"{parsed.scheme}://{parsed.netloc}"
+            else:
+                domain = ""
+            for proj in result:
+                raw_link = proj.get("Link")
+                # Falls Link schon absolut ist, bleibt er so
+                if raw_link and not raw_link.startswith("http") and domain:
+                    full_link = urljoin(domain, raw_link)
+                else:
+                    full_link = raw_link
+                all_rows.append({
+                    "Website": name,
+                    "Projektname": proj.get("Projektname"),
+                    "Link": full_link
+                })
         except Exception as e:
             print(f"Fehler bei {name}: {e}")
+    # Schreibe alles in eine Excel-Datei
+    df = pd.DataFrame(all_rows)
+    df.to_excel("alle_projekte.xlsx", index=False)
+    print("Excel-Datei 'alle_projekte.xlsx' wurde erstellt.")
 
 load_dotenv()
 
