@@ -1,3 +1,144 @@
+from dotenv import load_dotenv
+load_dotenv()
+def smart_ki_extraction(target):
+    """
+    Lädt den HTML-Quelltext einer Seite und nutzt Groq/DeepSeek, um relevante Daten (z.B. Projektnamen und Links) per Prompt zu extrahieren.
+    Args:
+        target (dict): Dict mit 'url' und 'Selector'.
+    Returns:
+        List[dict] oder str: Extrahierte Daten oder KI-Antwort
+    """
+    import requests
+    from bs4 import BeautifulSoup
+    html = requests.get(target['url']).text
+    soup = BeautifulSoup(html, "html.parser")
+    selector = target.get('Selector') or target.get('selector')
+    if not selector:
+        raise RuntimeError("Kein Selector angegeben!")
+    project_blocks = soup.select(selector)
+    if not project_blocks:
+        raise RuntimeError(f"Keine Projekt-Container ({selector}) gefunden. Bitte prüfe die Seite oder passe den Selektor an.")
+    relevant_html = '\n'.join(str(block) for block in project_blocks)
+    from crawl4ai import LLMExtractionStrategy
+    import os
+    import litellm
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key or api_key.strip() == "" or "dein_geheimer_api_key" in api_key:
+        raise RuntimeError("GROQ_API_KEY fehlt oder ist ungültig! Bitte prüfe die .env-Datei und setze einen gültigen Key.")
+    prompt = (
+        "Du bist ein Web-Scraping-Experte. Extrahiere alle Projektnamen und die zugehörigen Links aus folgendem HTML. Gib die Daten als JSON-Liste mit den Feldern 'Projektname' und 'Link' zurück. HTML:\n" + relevant_html
+    )
+    response = litellm.completion(
+        model="groq/deepseek-r1-distill-llama-70b",
+        messages=[{"role": "user", "content": prompt}],
+        api_key=api_key,
+        max_tokens=2048
+    )
+    import json
+    try:
+        return json.loads(response["choices"][0]["message"]["content"])
+    except Exception:
+        return response["choices"][0]["message"]["content"]
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, LLMExtractionStrategy
+import asyncio
+def auto_extract_with_groq(url):
+    """
+    Nutzt Groq/DeepSeek, um automatisch relevante Daten aus einer Webseite zu extrahieren.
+    Args:
+        url (str): Ziel-URL
+    Returns:
+        List[dict]: Extrahierte Objekte (z.B. Projekte)
+    """
+    async def run():
+        browser_config = BrowserConfig(browser_type="chromium", headless=True, verbose=False)
+        extraction_strategy = LLMExtractionStrategy(
+            provider="groq/deepseek-r1-distill-llama-70b",
+            api_token=os.getenv("GROQ_API_KEY"),
+            schema=None,  # Keine feste Struktur, KI soll selbst erkennen
+            extraction_type="auto",  # Automatische Extraktion
+            instruction="Extrahiere alle relevanten Objekte (z.B. Projekte, Immobilien, Namen, Links) aus dem folgenden Inhalt.",
+            input_format="markdown",
+            verbose=False,
+        )
+        async with AsyncWebCrawler(config=browser_config) as crawler:
+            result = await crawler.arun(
+                url=url,
+                config=CrawlerRunConfig(
+                    cache_mode=None,
+                    extraction_strategy=extraction_strategy,
+                    css_selector=None,
+                    session_id="auto-extract"
+                ),
+            )
+            if result.success and result.extracted_content:
+                try:
+                    return json.loads(result.extracted_content)
+                except Exception:
+                    return result.extracted_content
+            return []
+    return asyncio.run(run())
+import requests
+from bs4 import BeautifulSoup
+# Handler-Struktur für verschiedene Seiten
+def scrape_brunner_bau():
+    url = "https://www.brunner-bau.at/de/eigenprojekte"
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, "html.parser")
+    projects = []
+    for card in soup.select('.project-list-item'):
+        name_tag = card.select_one('.project-title')
+        link_tag = card.select_one('a')
+        if name_tag and link_tag:
+            name = name_tag.get_text(strip=True)
+            link = link_tag['href']
+            if not link.startswith('http'):
+                link = 'https://www.brunner-bau.at' + link
+            projects.append({
+                'Projektname': name,
+                'Link': link
+            })
+    return projects
+
+SCRAPE_HANDLERS = {
+    'brunner-bau.at': scrape_brunner_bau,
+    # Weitere Handler hier ergänzen
+}
+
+def scrape_projects_for_target(target):
+    """
+    Wählt den passenden Scraper-Handler für die Zielseite.
+    Args:
+        target (dict): Dict mit 'name' und 'url'.
+    Returns:
+        List[dict]: Projekte mit Name und Link
+    """
+    for domain, handler in SCRAPE_HANDLERS.items():
+        if domain in target['url']:
+            return handler()
+    return []  # Kein passender Handler
+import csv
+# ...existing code...
+def load_scrape_targets(filepath="scrape_targets.csv"):
+    """
+    Lädt die zu scrapenden Webseiten aus einer CSV-Datei.
+    Args:
+        filepath (str): Pfad zur CSV-Datei mit Name,URL.
+    Returns:
+        List[dict]: Liste mit Dicts {"name":..., "url":...}
+    """
+    targets = []
+    with open(filepath, newline='', encoding='utf-8') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            # Überspringe Kommentarzeilen oder leere Zeilen
+            if not row.get("URL") or row["URL"].startswith("#"):
+                continue
+            targets.append({
+                "name": row.get("Name"),
+                "url": row.get("URL"),
+                "Selector": row.get("Selector")
+            })
+    return targets
 import json
 import os
 from typing import List, Set, Tuple
@@ -24,7 +165,7 @@ def get_browser_config() -> BrowserConfig:
     # https://docs.crawl4ai.com/core/browser-crawler-config/
     return BrowserConfig(
         browser_type="chromium",  # Type of browser to simulate
-        headless=False,  # Whether to run in headless mode (no GUI)
+        headless=True,  # Headless-Modus für Server/Container
         verbose=True,  # Enable verbose logging
     )
 

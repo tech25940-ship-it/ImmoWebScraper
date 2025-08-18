@@ -1,17 +1,40 @@
-import asyncio
 
-from crawl4ai import AsyncWebCrawler
 from dotenv import load_dotenv
+load_dotenv()
+from utils.scraper_utils import smart_ki_extraction, load_scrape_targets
+import pandas as pd
 
-from config import BASE_URL, CSS_SELECTOR, REQUIRED_KEYS
-from utils.data_utils import (
-    save_venues_to_csv,
-)
-from utils.scraper_utils import (
-    fetch_and_process_page,
-    get_browser_config,
-    get_llm_strategy,
-)
+if __name__ == "__main__":
+    targets = load_scrape_targets()
+    import json
+    import re
+    for target in targets:
+        name = target.get('name') or target.get('Name') or 'website'
+        print(f"Starte KI-gestützte Extraktion für {name}...")
+        try:
+            result = smart_ki_extraction(target)
+            print("Extrahierte Daten:")
+            print(result)
+            # Fallback: Falls result kein echtes JSON ist, extrahiere den JSON-Codeblock
+            if isinstance(result, list):
+                df = pd.DataFrame(result)
+            else:
+                match = re.search(r"```json\s*(\[.*?\])\s*```", str(result), re.DOTALL)
+                if match:
+                    data = json.loads(match.group(1))
+                    df = pd.DataFrame(data)
+                else:
+                    match = re.search(r"(\[.*?\])", str(result), re.DOTALL)
+                    if match:
+                        data = json.loads(match.group(1))
+                        df = pd.DataFrame(data)
+                    else:
+                        raise ValueError("Konnte keine JSON-Daten extrahieren!")
+            filename = f"{name.lower().replace(' ', '_')}_projekte.xlsx"
+            df.to_excel(filename, index=False)
+            print(f"Excel-Datei '{filename}' wurde erstellt.")
+        except Exception as e:
+            print(f"Fehler bei {name}: {e}")
 
 load_dotenv()
 
@@ -79,5 +102,4 @@ async def main():
     await crawl_venues()
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+## Entfernt: Async-Crawler-Block, damit nur die Haslehner-Extraktion läuft
