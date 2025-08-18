@@ -1,0 +1,9 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = true
+[remote "origin"]
+	url = https://github.com/tech25940-ship-it/deepseek-ai-web-crawler.git
+	tagOpt = --no-tags
+	fetch = +refs/*:refs/*
+	mirror = true
