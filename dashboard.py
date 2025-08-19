@@ -54,6 +54,7 @@ def write_targets(targets):
                 "Selector": t.get("selector", "")
             })
 
+
 # --- Crawling Logic ---
 def run_crawling():
     global progress
@@ -148,7 +149,7 @@ tr:nth-child(even) {background:#fafafa;}
 #download {margin-top:15px;}
 a {color:#4caf50; font-weight:bold; text-decoration:none;}
 a:hover {text-decoration:underline;}
-#iframe-preview {width:100%; height:400px; border:1px solid #ccc; margin-top:20px;}
+#iframe-preview {width:100%; height:800px; border:1px solid #ccc; margin-top:20px;}
 .outline-red { outline: 2px solid red !important; }
 </style>
 </head>
