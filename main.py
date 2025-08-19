@@ -121,6 +121,3 @@ async def main():
     Entry point of the script.
     """
     await crawl_venues()
-
-
-## Entfernt: Async-Crawler-Block, damit nur die Haslehner-Extraktion läuft

@@ -39,6 +39,52 @@ def smart_ki_extraction(target):
         return json.loads(response["choices"][0]["message"]["content"])
     except Exception:
         return response["choices"][0]["message"]["content"]
+    
+    def ki_extraction_with_rate_limit(project_texts, model="groq/deepseek-r1-distill-llama-70b", api_key=None, max_tokens=2048):
+        """
+        Führt KI-Extraktion für eine Liste von Projekten durch und behandelt RateLimitError automatisch.
+        Args:
+            project_texts (List[str]): Liste mit HTML/Text für einzelne Projekte.
+            model (str): Modellname.
+            api_key (str): Groq API Key.
+            max_tokens (int): Maximale Tokenzahl pro Anfrage.
+        Returns:
+            List: KI-Antworten für alle Projekte.
+        """
+        import time
+        import re
+        import litellm
+        results = []
+        for text in project_texts:
+            while True:
+                try:
+                    response = litellm.completion(
+                        model=model,
+                        messages=[{"role": "user", "content": text}],
+                        api_key=api_key,
+                        max_tokens=max_tokens
+                    )
+                    results.append(response["choices"][0]["message"]["content"])
+                    break
+                except litellm.RateLimitError as e:
+                    wait_time = extract_wait_time_from_error(str(e))
+                    print(f"RateLimit erreicht, warte {wait_time} Sekunden...")
+                    time.sleep(wait_time)
+        return results
+
+    def extract_wait_time_from_error(error_msg):
+        """
+        Extrahiert die Wartezeit aus einer RateLimitError-Meldung.
+        Args:
+            error_msg (str): Fehlermeldung als String.
+        Returns:
+            int: Sekunden zum Warten.
+        """
+        # Suche nach "try again in ...s" im Error-String
+        match = re.search(r"try again in ([\d\.]+)s", error_msg)
+        if match:
+            return int(float(match.group(1))) + 1
+        return 60  # Fallback: 1 Minute warten
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, LLMExtractionStrategy
 import asyncio
 def auto_extract_with_groq(url):

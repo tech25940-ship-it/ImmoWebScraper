@@ -1,6 +1,6 @@
 # Deep Seek Crawler
 
-This project is a web crawler built with Python that extracts venue data (wedding reception venues) from a website using asynchronous programming with Crawl4AI. It utilizes a language model-based extraction strategy and saves the collected data to a CSV file.
+This project is a web crawler built with Python that extracts data from a website using asynchronous programming with Crawl4AI. It utilizes a language model-based extraction strategy and saves the collected data to a CSV file. Based on this project https://www.youtube.com/watch?v=Osl4NgAXvRk 
 
 ## Features
 
@@ -62,11 +62,7 @@ The script will crawl the specified website, extract data page by page, and save
 
 ## Configuration
 
-The `config.py` file contains key constants used throughout the project:
-
-- **BASE_URL**: The URL of the website from which to extract venue data.
-- **CSS_SELECTOR**: CSS selector string used to target venue content.
-- **REQUIRED_KEYS**: List of required fields to consider a venue complete.
+The `scrape_targets.csv` file contains Website Name, Url, and selector:
 
 You can modify these values as needed.
 
