@@ -1,8 +1,11 @@
-from flask import Flask, render_template_string, request, send_file, jsonify
+from flask import Flask, render_template_string, request, send_file, jsonify, Response
 import threading
 import os
 import json
 import datetime
+import csv
+import requests
+
 
 app = Flask(__name__)
 
@@ -16,12 +19,22 @@ progress = {
 
 TARGETS_FILE = "scrape_targets.csv"
 
+# --- Utility Functions ---
+def normalize_selector(selector):
+    if not selector:
+        return ""
+    selector = selector.strip()
+    if ' ' in selector:
+        selector = '.'.join(selector.split())
+    if not selector.startswith(('div', '.', '#')):
+        selector = 'div.' + selector
+    return selector
+
 def read_targets():
-    import csv
     targets = []
     if os.path.exists(TARGETS_FILE):
-        with open(TARGETS_FILE, newline='', encoding="utf-8") as csvfile:
-            reader = csv.DictReader(csvfile)
+        with open(TARGETS_FILE, newline='', encoding="utf-8") as f:
+            reader = csv.DictReader(f)
             for row in reader:
                 targets.append({
                     "name": row.get("Name", ""),
@@ -30,10 +43,8 @@ def read_targets():
                 })
     return targets
 
-
 def write_targets(targets):
-    import csv
-    with open(TARGETS_FILE, "w", encoding="utf-8", newline='') as f:
+    with open(TARGETS_FILE, "w", newline='', encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=["Name", "URL", "Selector"])
         writer.writeheader()
         for t in targets:
@@ -43,32 +54,32 @@ def write_targets(targets):
                 "Selector": t.get("selector", "")
             })
 
-# ---- Crawling (echter Scraper) ----
+# --- Crawling Logic ---
 def run_crawling():
     global progress
-    progress["status"] = "Starte Crawling..."
-    progress["percent"] = 0
-    progress["error"] = ""
-    progress["file_ready"] = False
-    progress["filename"] = f"alle_projekte_{datetime.datetime.now():%Y%m%d_%H%M%S}.xlsx"
-
+    progress.update({
+        "status": "Starte Crawling...",
+        "percent": 0,
+        "error": "",
+        "file_ready": False,
+        "filename": f"alle_projekte_{datetime.datetime.now():%Y%m%d_%H%M%S}.xlsx"
+    })
     try:
         from utils.scraper_utils import smart_ki_extraction, load_scrape_targets
-        import json, re, pandas as pd
+        import pandas as pd
         from urllib.parse import urlparse, urljoin
+        import re
 
         targets = load_scrape_targets()
         all_rows = []
-        step = 0
         total = len(targets)
 
-        for target in targets:
-            step += 1
+        for idx, target in enumerate(targets, start=1):
             name = target.get('name', 'website')
             url = target.get('url')
             selector = target.get('selector')
-            progress["status"] = f"Extrahiere Daten von {name} ({step}/{total})..."
-            progress["percent"] = int((step/total)*100)
+            progress["status"] = f"Extrahiere Daten von {name} ({idx}/{total})..."
+            progress["percent"] = int((idx / total) * 100)
 
             try:
                 result = smart_ki_extraction(target)
@@ -99,15 +110,18 @@ def run_crawling():
 
         df = pd.DataFrame(all_rows)
         df.to_excel(progress["filename"], index=False)
-        progress["status"] = "Fertig! Excel-Datei erstellt."
-        progress["percent"] = 100
-        progress["file_ready"] = True
-
+        progress.update({
+            "status": "Fertig! Excel-Datei erstellt.",
+            "percent": 100,
+            "file_ready": True
+        })
     except Exception as e:
-        progress["status"] = "Fehler beim Crawling!"
-        progress["error"] = str(e)
+        progress.update({
+            "status": "Fehler beim Crawling!",
+            "error": str(e)
+        })
 
-# ---- Routes ----
+# --- Flask Routes ---
 @app.route("/")
 def index():
     targets = read_targets()
@@ -134,18 +148,23 @@ tr:nth-child(even) {background:#fafafa;}
 #download {margin-top:15px;}
 a {color:#4caf50; font-weight:bold; text-decoration:none;}
 a:hover {text-decoration:underline;}
+#iframe-preview {width:100%; height:400px; border:1px solid #ccc; margin-top:20px;}
+.outline-red { outline: 2px solid red !important; }
 </style>
 </head>
 <body>
-<h2>🌐 Web-Crawler Dashboard</h2>
+<h2>🌐 Immo-Web-Crawler Dashboard</h2>
 <p>Ziele verwalten und Crawling starten:</p>
 
 <form id="addform" onsubmit="addTarget();return false;">
   <input name="name" placeholder="Name" required>
-  <input name="url" placeholder="URL" required>
-  <input name="selector" placeholder="Selector" required>
+  <input name="url" placeholder="URL" required onchange="updateIframe(this.value)">
+  <input name="selector" placeholder="Selector" required id="selector-input">
   <button type="submit">+ Hinzufügen</button>
 </form>
+
+<iframe id="iframe-preview"></iframe>
+<p>Klicke auf ein Element in der Vorschau, um den Selector automatisch auszufüllen.</p>
 
 <table>
 <tr><th>Name</th><th>URL</th><th>Selector</th><th>Löschen</th></tr>
@@ -159,42 +178,136 @@ a:hover {text-decoration:underline;}
 {% endfor %}
 </table>
 
-<button id="crawlbtn" style="margin-top:20px;" onclick="startCrawling()">🚀 Crawling starten</button>
+<button id="crawlbtn" onclick="startCrawling()">🚀 Crawling starten</button>
 <div id="status">Bereit</div>
 <div id="progressbar"><div id="bar"></div></div>
 <div id="download"></div>
 
 <script>
-function startCrawling() { fetch('/start', {method:'POST'}).then(()=>update()); }
-function update() {
-  fetch('/progress').then(r=>r.json()).then(data=>{
-    let status = data.status;
-    if(data.error) status += " ⚠️ "+data.error;
-    document.getElementById('status').innerText = status;
-    document.getElementById('bar').style.width = data.percent+'%';
-    if(data.file_ready) {
-      document.getElementById('download').innerHTML='<a href="/download">📥 Excel herunterladen</a>';
-    } else {
-      document.getElementById('download').innerHTML='';
-      setTimeout(update,1000);
+const iframe = document.getElementById('iframe-preview');
+const selectorInput = document.getElementById('selector-input');
+
+function updateIframe(url) {
+    if(!url.startsWith('http')) url = 'https://' + url;
+    // Proxy nutzen, um CORS zu umgehen
+    iframe.src = '/proxy?url=' + encodeURIComponent(url);
+    iframe.onload = attachSelectorClick;
+}
+
+function attachSelectorClick() {
+    try {
+        const doc = iframe.contentDocument || iframe.contentWindow.document;
+        if (!doc) return;
+
+        // Entferne alte Listener und Outlines
+        doc.querySelectorAll('*').forEach(el => {
+            el.onclick = null;
+            el.classList.remove('outline-red');
+        });
+
+        // Füge auffälliges CSS ein
+        let style = doc.getElementById('highlight-style');
+        if (!style) {
+            style = doc.createElement('style');
+            style.id = 'highlight-style';
+            style.innerHTML = `
+                .outline-red {
+                    outline: 4px solid red !important;
+                    background: rgba(255,0,0,0.1) !important;
+                    transition: all 0.2s;
+                }
+            `;
+            doc.head.appendChild(style);
+        }
+
+        // Neue Listener setzen
+        doc.querySelectorAll('*').forEach(el => {
+            el.addEventListener('click', function(e){
+                e.preventDefault();
+                e.stopPropagation();
+
+                // Selector ins Input eintragen
+                const selector = generateSelector(e.target);
+                selectorInput.value = selector;
+
+                // Nur das geklickte Element markieren
+                doc.querySelectorAll('.outline-red').forEach(x => x.classList.remove('outline-red'));
+                e.target.classList.add('outline-red');
+            });
+        });
+    } catch(err) {
+        console.warn("Konnte Selector-Click nicht setzen:", err);
     }
-  });
 }
-function addTarget() {
-  let f=document.getElementById('addform');
-  let data=new FormData(f);
-  fetch('/add_target',{method:'POST',body:data}).then(()=>location.reload());
+
+
+function removeCookieBanners() {
+    const doc = iframe.contentDocument || iframe.contentWindow.document;
+    if (!doc) return;
+
+    const banners = doc.querySelectorAll(
+        '[class*="cookie"], [id*="cookie"], [class*="banner"], [id*="banner"], [class*="consent"], [id*="consent"]'
+    );
+
+    banners.forEach(b => {
+        try {
+            const btn = b.querySelector('button');
+            if (btn) btn.click();
+            b.style.display = 'none';
+        } catch(e){}
+    });
 }
-function deleteTarget(name,url) {
+
+// Laufende Überprüfung alle 500ms
+setInterval(removeCookieBanners, 500);
+
+
+
+function generateSelector(el) {
+    if (!el) return '';
+    let selector = el.tagName.toLowerCase();
+    if (el.classList.length > 0) {
+        // Alle Klassen außer 'outline-red' nehmen
+        let classes = Array.from(el.classList).filter(c => c !== 'outline-red');
+        if (classes.length > 0) selector += '.' + classes.join('.');
+    }
+    return selector; // Nur das geklickte Element, kein Pfad nach oben
+}
+
+
+
+// Optional: direkt beim Laden die Liste aktualisieren
+updateIframe(document.querySelector('input[name="url"]').value);
+
+function startCrawling(){ fetch('/start',{method:'POST'}).then(()=>update()); }
+
+function update(){
+    fetch('/progress').then(r=>r.json()).then(data=>{
+        let status = data.status + (data.error ? " ⚠️ " + data.error : "");
+        document.getElementById('status').innerText = status;
+        document.getElementById('bar').style.width = data.percent+'%';
+        if(data.file_ready){
+            document.getElementById('download').innerHTML='<a href="/download">📥 Excel herunterladen</a>';
+        } else {
+            setTimeout(update,1000);
+        }
+    });
+}
+
+function addTarget(){
+    let f=document.getElementById('addform');
+    let data=new FormData(f);
+    fetch('/add_target',{method:'POST',body:data}).then(()=>location.reload());
+}
+
+function deleteTarget(name,url){
     fetch('/delete_target',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({name,url})
-    }).then(r=>r.json()).then(targets=>{
-        // Tabelle neu rendern
-        location.reload();
-    });
+    }).then(()=>location.reload());
 }
+
 update();
 </script>
 </body>
@@ -205,7 +318,7 @@ update();
 def add_target():
     name = request.form.get("name")
     url = request.form.get("url")
-    selector = request.form.get("selector")
+    selector = normalize_selector(request.form.get("selector"))
     targets = read_targets()
     targets.append({"name": name, "url": url, "selector": selector})
     write_targets(targets)
@@ -218,18 +331,32 @@ def delete_target():
     url = data.get("url")
     targets = [t for t in read_targets() if not (t["name"]==name and t["url"]==url)]
     write_targets(targets)
-    # Nach dem Löschen die aktualisierte Liste zurückgeben
     return jsonify(targets)
 
 @app.route("/start", methods=["POST"])
 def start():
-    t = threading.Thread(target=run_crawling)
-    t.start()
+    threading.Thread(target=run_crawling).start()
     return "OK"
 
 @app.route("/progress")
 def get_progress():
     return jsonify(progress)
+
+@app.route("/proxy")
+def proxy():
+    url = request.args.get("url")
+    if not url:
+        return "Keine URL angegeben", 400
+    if not url.startswith("http"):
+        url = "https://" + url
+    try:
+        r = requests.get(url)
+        html = r.text
+        # Optional: Skripte deaktivieren, um Klickprobleme zu vermeiden
+        html = html.replace("<head>", "<head><base href='{}'>".format(url))
+        return Response(html, mimetype="text/html")
+    except Exception as e:
+        return f"Fehler beim Laden der Seite: {e}", 500
 
 @app.route("/download")
 def download():
