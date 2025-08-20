@@ -17,7 +17,14 @@ progress = {
     "filename": "alle_projekte.xlsx"
 }
 
-TARGETS_FILE = "/tmp/scrape_targets.csv"
+TARGETS_FILE = "scrape_targets.csv"
+
+# Datei anlegen, falls sie noch nicht existiert
+if not os.path.exists(TARGETS_FILE):
+    with open(TARGETS_FILE, "w", newline='', encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=["Name", "URL", "Selector"])
+        writer.writeheader()
+
 
 # --- Utility Functions ---
 def normalize_selector(selector):
@@ -55,6 +62,8 @@ def write_targets(targets):
             })
 
 
+import tempfile
+
 # --- Crawling Logic ---
 def run_crawling():
     global progress
@@ -63,7 +72,9 @@ def run_crawling():
         "percent": 0,
         "error": "",
         "file_ready": False,
-        "filename": f"alle_projekte_{datetime.datetime.now():%Y%m%d_%H%M%S}.xlsx"
+        progress["filename"] = os.path.join(tempfile.gettempdir(),
+                                            f"alle_projekte_{datetime.datetime.now():%Y%m%d_%H%M%S}.xlsx")
+
     })
     try:
         from utils.scraper_utils import smart_ki_extraction, load_scrape_targets
@@ -361,10 +372,11 @@ def proxy():
 
 @app.route("/download")
 def download():
-    filepath = os.path.join(os.getcwd(), progress["filename"])
+    filepath = progress["filename"]
     if os.path.exists(filepath):
         return send_file(filepath, as_attachment=True)
-    return "Datei nicht gefunden",404
+    return "Datei nicht gefunden", 404
+
 
 if __name__=="__main__":
     import os
