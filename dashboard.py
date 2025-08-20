@@ -17,7 +17,7 @@ progress = {
     "filename": "alle_projekte.xlsx"
 }
 
-TARGETS_FILE = "scrape_targets.csv"
+TARGETS_FILE = "/tmp/scrape_targets.csv"
 
 # --- Utility Functions ---
 def normalize_selector(selector):
