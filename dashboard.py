@@ -72,9 +72,10 @@ def run_crawling():
         "percent": 0,
         "error": "",
         "file_ready": False,
-        progress["filename"] = os.path.join(tempfile.gettempdir(),
-                                            f"alle_projekte_{datetime.datetime.now():%Y%m%d_%H%M%S}.xlsx")
-
+        "filename": os.path.join(
+            tempfile.gettempdir(),
+            f"alle_projekte_{datetime.datetime.now():%Y%m%d_%H%M%S}.xlsx"
+        )
     })
     try:
         from utils.scraper_utils import smart_ki_extraction, load_scrape_targets
