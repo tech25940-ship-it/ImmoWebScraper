@@ -363,13 +363,13 @@ def proxy():
     if not url.startswith("http"):
         url = "https://" + url
     try:
-        r = requests.get(url)
+        r = requests.get(url, headers={"User-Agent":"Mozilla/5.0"}, timeout=10)
         html = r.text
-        # Optional: Skripte deaktivieren, um Klickprobleme zu vermeiden
-        html = html.replace("<head>", "<head><base href='{}'>".format(url))
+        html = html.replace("<head>", f"<head><base href='{url}'>")
         return Response(html, mimetype="text/html")
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
         return f"Fehler beim Laden der Seite: {e}", 500
+
 
 @app.route("/download")
 def download():
