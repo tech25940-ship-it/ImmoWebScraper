@@ -163,6 +163,14 @@ a {color:#4caf50; font-weight:bold; text-decoration:none;}
 a:hover {text-decoration:underline;}
 #iframe-preview {width:100%; height:800px; border:1px solid #ccc; margin-top:20px;}
 .outline-red { outline: 2px solid red !important; }
+button {background:#4caf50; color:white; cursor:pointer; transition:background 0.2s;}
+button:hover {background:#45a049;}
+#crawlbtn {
+    margin-top: 25px;
+    padding: 12px 20px;
+    font-size: 16px;
+}
+
 </style>
 </head>
 <body>
