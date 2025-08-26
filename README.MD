@@ -1,77 +1,80 @@
-# Deep Seek Crawler
+DeepSeek Immo Crawler
 
-This project is a web crawler built with Python that extracts data from a website using asynchronous programming with Crawl4AI. It utilizes a language model-based extraction strategy and saves the collected data to a CSV file. Based on this project https://www.youtube.com/watch?v=Osl4NgAXvRk 
+Dieses Projekt ist ein webbasiertes Crawler-Dashboard, das mit Flask entwickelt wurde.
+Es kombiniert klassisches Web-Scraping (BeautifulSoup) mit KI-gestützter Extraktion (Groq DeepSeek) und ermöglicht es, Webseiten per CSS-Selector zu definieren, zu crawlen und die Ergebnisse in Excel-Dateien zu exportieren.
 
-## Features
+Features
 
-- Asynchronous web crawling using [Crawl4AI](https://pypi.org/project/Crawl4AI/)
-- Data extraction powered by a language model (LLM)
-- CSV export of extracted venue information
-- Modular and easy-to-follow code structure ideal for beginners
+Web-Dashboard (Flask) zur Verwaltung von Zielseiten (Name, URL, CSS-Selector)
 
-## Project Structure
-```
+Visuelle Auswahl von CSS-Selektoren über ein eingebettetes IFrame
+
+KI-gestützte Extraktion von Projektnamen und Links mit Groq DeepSeek R1 Llama 70B
+
+Export der Ergebnisse in Excel-Dateien
+
+Fortschrittsanzeige mit Status, Prozentanzeige und Download-Link
+
+Asynchrones Crawling mit Crawl4AI für umfangreiche Datenmengen
+
+Projektstruktur
 .
-├── main.py # Main entry point for the crawler
-├── config.py # Contains configuration constants (Base URL, CSS selectors, etc.)
-├── models
-│ └── venue.py # Defines the Venue data model using Pydantic
-├── utils
-│ ├── init.py # (Empty) Package marker for utils
-│ ├── data_utils.py # Utility functions for processing and saving data
-│ └── scraper_utils.py # Utility functions for configuring and running the crawler
-├── requirements.txt # Python package dependencies
-├── .gitignore # Git ignore file (e.g., excludes .env and CSV files)
-└── README.MD # This file
-```
+├── app.py                # Flask-App mit Dashboard und Crawling-Logik
+├── scrape_targets.csv     # Gespeicherte Zielseiten (Name, URL, Selector)
+├── utils/
+│   ├── scraper_utils.py   # smart_ki_extraction und weitere Hilfsfunktionen
+│   └── data_utils.py      # Duplicate-Check, Validierung usw.
+├── models/
+│   └── venue.py           # Datenmodell
+├── requirements.txt       # Python-Abhängigkeiten
+├── .env                   # API Keys und Einstellungen (nicht in Git)
+└── README.md              # Projektdokumentation
 
-## Installation
+Installation
 
-1. **Create and Activate a Conda Environment**
+Virtuelle Umgebung erstellen und aktivieren, z. B. mit Conda:
 
-   ```bash
-   conda create -n deep-seek-crawler python=3.12 -y
-   conda activate deep-seek-crawler
-   ```
+conda create -n immo-crawler python=3.12 -y
+conda activate immo-crawler
 
-2. **Install Dependencies**
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+Abhängigkeiten installieren:
 
-3. **Set Up Your Environment Variables**
+pip install -r requirements.txt
 
-   Create a `.env` file in the root directory with content similar to:
 
-   ```env
-   GROQ_API_KEY=your_groq_api_key_here
-   ```
+Umgebungsvariablen konfigurieren:
+Erstelle eine .env-Datei im Projektverzeichnis mit folgendem Inhalt:
 
-   *(Note: The `.env` file is in your .gitignore, so it won’t be pushed to version control.)*
+GROQ_API_KEY=your_groq_api_key_here
+MAX_TEXT_LEN=300
 
-## Usage
 
-To start the crawler, run:
+MAX_TEXT_LEN definiert die maximale Zeichenlänge pro Textabschnitt, der an die KI übergeben wird (Standard: 300).
 
-```bash
-python main.py
-```
+Nutzung
 
-The script will crawl the specified website, extract data page by page, and save the complete venues to a `complete_venues.csv` file in the project directory. Additionally, usage statistics for the LLM strategy will be displayed after crawling.
+Starte die Flask-Anwendung mit:
 
-## Configuration
+python dashboard.py
 
-The `scrape_targets.csv` file contains Website Name, Url, and selector:
 
-You can modify these values as needed.
+Öffne anschließend http://localhost:5000 im Browser.
+Dort können Zielseiten mit Namen, URL und Selektor hinzugefügt werden.
+Nach Start des Crawlings zeigt das Dashboard den Fortschritt an und ermöglicht den Download der Ergebnisse als Excel-Datei.
 
-## Additional Notes
+Konfiguration
 
-- **Logging:** The project currently uses print statements for status messages. For production or further development, consider integrating Python’s built-in `logging` module.
-- **Improvements:** The code is structured in multiple modules to maintain separation of concerns, making it easier for beginners to follow and extend the functionality.
-- **Dependencies:** Ensure that the package versions specified in `requirements.txt` are installed to avoid compatibility issues.
+Zielseiten werden in der Datei scrape_targets.csv gespeichert.
 
-## License
+Jede Zeile enthält Name, URL und CSS-Selector.
 
-Include license information if applicable.
+Änderungen können direkt über das Dashboard oder manuell in der CSV-Datei erfolgen.
+
+Hinweise
+
+Logging erfolgt derzeit über einfache Konsolenausgaben. Für den produktiven Einsatz empfiehlt sich die Nutzung des Python-Logging-Frameworks.
+
+Die Modulare Struktur (utils, models, app.py) ermöglicht eine leichte Erweiterung und Anpassung.
+
+Alle API-Schlüssel und sensiblen Konfigurationswerte sind über .env steuerbar und sollten nicht in die Versionskontrolle gelangen.
