@@ -79,3 +79,5 @@ Die modulare Struktur (utils, models, dashboard.py) ermöglicht eine leichte Erw
 
 Alle API-Schlüssel und sensiblen Konfigurationswerte sind über .env steuerbar und sollten nicht in die Versionskontrolle gelangen.
 
+Zum Wählen des Selector direkt auf den Gesamtcontainer klicken, wenn im Excel keine Ergebnisse eingtragen werden, dann eine Ebene kleiner den Container wählen.
+
