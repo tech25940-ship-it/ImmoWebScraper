@@ -5,6 +5,10 @@ import json
 import datetime
 import csv
 import requests
+from bs4 import BeautifulSoup
+import re
+
+
 
 
 app = Flask(__name__)
@@ -19,14 +23,14 @@ progress = {
 
 TARGETS_FILE = "scrape_targets.csv"
 
-# Datei anlegen, falls sie noch nicht existiert
+# Datei anlegen, wenn sie noch nicht existiert
 if not os.path.exists(TARGETS_FILE):
     with open(TARGETS_FILE, "w", newline='', encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=["Name", "URL", "Selector"])
         writer.writeheader()
 
 
-# --- Utility Functions ---
+# Utility Functions
 def normalize_selector(selector):
     if not selector:
         return ""
@@ -64,7 +68,7 @@ def write_targets(targets):
 
 import tempfile
 
-# --- Crawling Logic ---
+# Crawling Logic 
 def run_crawling():
     global progress
     progress.update({
@@ -134,7 +138,7 @@ def run_crawling():
             "error": str(e)
         })
 
-# --- Flask Routes ---
+# Flask Routes
 @app.route("/")
 def index():
     targets = read_targets()
@@ -226,7 +230,7 @@ function attachSelectorClick() {
             el.classList.remove('outline-red');
         });
 
-        // Füge auffälliges CSS ein
+        // Füge CSS für Outline hinzu
         let style = doc.getElementById('highlight-style');
         if (!style) {
             style = doc.createElement('style');
@@ -241,17 +245,22 @@ function attachSelectorClick() {
             doc.head.appendChild(style);
         }
 
-        // Neue Listener setzen
+        // Listener setzen
         doc.querySelectorAll('*').forEach(el => {
             el.addEventListener('click', function(e){
                 e.preventDefault();
                 e.stopPropagation();
 
+                // Cookie-Banner ignorieren
+                if (e.target.closest('[class*="cookie"], [id*="cookie"], [class*="banner"], [id*="banner"], [class*="consent"], [id*="consent"]')) {
+                    return;
+                }
+
                 // Selector ins Input eintragen
                 const selector = generateSelector(e.target);
                 selectorInput.value = selector;
 
-                // Nur das geklickte Element markieren
+                // Nur geklicktes Element markieren
                 doc.querySelectorAll('.outline-red').forEach(x => x.classList.remove('outline-red'));
                 e.target.classList.add('outline-red');
             });
@@ -260,7 +269,6 @@ function attachSelectorClick() {
         console.warn("Konnte Selector-Click nicht setzen:", err);
     }
 }
-
 
 function removeCookieBanners() {
     const doc = iframe.contentDocument || iframe.contentWindow.document;
@@ -279,7 +287,7 @@ function removeCookieBanners() {
     });
 }
 
-// Laufende Überprüfung alle 500ms
+// Laufende Überprüfung
 setInterval(removeCookieBanners, 500);
 
 
